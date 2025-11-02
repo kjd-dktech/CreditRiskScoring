@@ -1,0 +1,50 @@
+# .gitignore
+
+*.pyc
+__pycache__/
+*.pyo
+*.pyd
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints
+
+# Data files
+Data/*
+!Data/nouvelle_donnee_predite_filtre.csv
+!Data/nouvelle_donnee_predite.csv
+!Data/Train.csv
+!Data/Test.csv
+!Data/prediction_filter.py
+!Data/presets.sh
+!Data/generate_presets.py
+
+# Documentation files
+Docs/Charge/*
+
+#Vitual environment
+memoriel3csstacking/
+
+# Notebooks
+Notebook/interpretation.ipynb
+
+# Web app files
+web/.env.example
+web/node_modules/
+web/.next
+
+# Fichiers de configuration locaux
+.env
+*.env
+.python-version
+
+# Docker
+*.pid
+*.log
+
+# VSCode
+.vscode/
+.settings/
+
+# Autres
+.DS_Store
+Thumbs.db
