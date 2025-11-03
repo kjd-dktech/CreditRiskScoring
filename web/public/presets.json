@@ -77,36 +77,36 @@
     }
   },
   {
-    "name": "Low — Type_1 — p=0.21",
+    "name": "Low — Type_3 — p=0.00",
     "data": {
-      "Total_Amount": 1755.0,
-      "Total_Amount_to_Repay": 1999.0,
+      "Total_Amount": 4420.57,
+      "Total_Amount_to_Repay": 1.19,
       "duration": 7,
-      "Lender_portion_to_be_repaid": 600.0,
+      "Lender_portion_to_be_repaid": 597.37,
+      "New_versus_Repeat": "Repeat Loan",
+      "loan_type": "Type_3"
+    }
+  },
+  {
+    "name": "Low — Type_1 — p=0.00",
+    "data": {
+      "Total_Amount": 699.0,
+      "Total_Amount_to_Repay": 644.0,
+      "duration": 7,
+      "Lender_portion_to_be_repaid": 0.0,
       "New_versus_Repeat": "Repeat Loan",
       "loan_type": "Type_1"
     }
   },
   {
-    "name": "Low — Type_2 — p=0.21",
+    "name": "Low — Type_1 — p=0.00",
     "data": {
-      "Total_Amount": 20096.46,
-      "Total_Amount_to_Repay": 22106.11,
-      "duration": 180,
-      "Lender_portion_to_be_repaid": 6963.42,
+      "Total_Amount": 1170.0,
+      "Total_Amount_to_Repay": 1106.0,
+      "duration": 7,
+      "Lender_portion_to_be_repaid": 356.0,
       "New_versus_Repeat": "Repeat Loan",
-      "loan_type": "Type_2"
-    }
-  },
-  {
-    "name": "Low — Type_2 — p=0.22",
-    "data": {
-      "Total_Amount": 108852.67,
-      "Total_Amount_to_Repay": 108852.67,
-      "duration": 180,
-      "Lender_portion_to_be_repaid": 12572.48,
-      "New_versus_Repeat": "New Loan",
-      "loan_type": "Type_2"
+      "loan_type": "Type_1"
     }
   }
 ]

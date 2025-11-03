@@ -1,6 +1,8 @@
-# Web — Credit‑Risk‑Scoring (Next.js)
+# Web — interface Next.js
 
-Application SPA Next.js + Tailwind servant d'interface de démonstration pour l'API de scoring.
+[![Vercel](https://img.shields.io/badge/deploy-ready-lightgrey)](https://vercel.com/) [![license](https://img.shields.io/github/license/kjd-dktech/CreditRiskScoring?color=blue)](../LICENSE)
+
+Application SPA (Next.js + Tailwind) utilisée comme interface de démonstration pour l'API de scoring.
 
 ## Résumé
 
@@ -8,12 +10,14 @@ Application SPA Next.js + Tailwind servant d'interface de démonstration pour l'
 - Style : Tailwind CSS
 - Emplacement de configuration API : `web/src/lib/config.ts` (utilise `process.env.NEXT_PUBLIC_API_BASE`)
 
-## Installation (dev)
+## Démarrage en développement
+
+Depuis le dossier `web/` :
 
 ```bash
-cd web
-npm install
-npm run dev
+    cd web
+    npm install
+    npm run dev
 ```
 
 L'application démarre par défaut sur `http://localhost:3000`.
@@ -23,14 +27,14 @@ L'application démarre par défaut sur `http://localhost:3000`.
 Le front utilise `web/src/lib/config.ts` :
 
 ```ts
-export const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:8000';
+    export const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:8000';
 ```
 
 Pour pointer vers une API distante en dev :
 
 ```bash
-export NEXT_PUBLIC_API_BASE=https://mon-api.example.com
-npm run dev
+    export NEXT_PUBLIC_API_BASE=https://mon-api.example.com
+    npm run dev
 ```
 
 ## Scripts utiles (depuis `web/`)

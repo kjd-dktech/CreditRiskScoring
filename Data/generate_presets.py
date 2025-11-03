@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Generate demo presets from a filtered CSV (nouvelle_donnee_predite_filtre.csv).
+Generate demo presets from a predicted CSV (nouvelle_donnee_predite.csv).
 
 Features:
 - Validates required columns
@@ -10,7 +10,7 @@ Features:
 
 Usage:
   python Data/generate_presets.py \
-    --csv Data/nouvelle_donnee_predite_filtre.csv \
+    --csv Data/nouvelle_donnee_predite.csv \
     --out web/public/presets.json
 
 Optional:
@@ -161,7 +161,7 @@ def detect_default_out() -> str:
 
 def main(argv: List[str] | None = None) -> int:
     p = argparse.ArgumentParser(description="Generate demo presets JSON from CSV")
-    p.add_argument("--csv", dest="csv_path", default=os.path.join("Data", "nouvelle_donnee_predite_filtre.csv"))
+    p.add_argument("--csv", dest="csv_path", default=os.path.join("Data", "nouvelle_donnee_predite.csv"))
     p.add_argument("--n-high", type=int, default=4)
     p.add_argument("--n-mid", type=int, default=3)
     p.add_argument("--n-low", type=int, default=3)
