@@ -1,71 +1,30 @@
-# Web — interface Next.js
+# Web — Interface Next.js
 
-[![Vercel](https://img.shields.io/badge/deploy-ready-lightgrey)](https://vercel.com/) [![license](https://img.shields.io/github/license/kjd-dktech/CreditRiskScoring?color=blue)](../LICENSE)
+Interface utilisateur moderne pour visualiser les scores de crédit et leur explication.
 
-Application SPA (Next.js + Tailwind) utilisée comme interface de démonstration pour l'API de scoring.
+## Stack Technique
 
-## Résumé
-
-- Framework : Next.js (App Router), TypeScript
-- Style : Tailwind CSS
-- Emplacement de configuration API : `web/src/lib/config.ts` (utilise `process.env.NEXT_PUBLIC_API_BASE`)
-
-## Démarrage en développement
-
-Depuis le dossier `web/` :
-
-```bash
-    cd web
-    npm install
-    npm run dev
-```
-
-L'application démarre par défaut sur `http://localhost:3000`.
+- **Framework** : Next.js 13+ (App Router)
+- **Styling** : Tailwind CSS
+- **État** : React Hooks
 
 ## Configuration
 
-Le front utilise `web/src/lib/config.ts` :
+L'URL de l'API Backend est définie via la variable `NEXT_PUBLIC_API_BASE`.
 
-```ts
-    export const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:8000';
-```
+- **Avec Docker** : Géré automatiquement (`http://localhost:7860` mappé).
+- **En Local** : Par défaut sur `http://localhost:8000`.
 
-Pour pointer vers une API distante en dev :
+## Scripts
 
 ```bash
-    export NEXT_PUBLIC_API_BASE=https://mon-api.example.com
-    npm run dev
+cd web
+npm install
+
+# Développement (localhost:3000)
+npm run dev
+
+# Construction Production
+npm run build
+npm start
 ```
-
-## Scripts utiles (depuis `web/`)
-
-- `npm run dev` — démarre le serveur de développement (port 3000)
-- `npm run build` — build de production
-- `npm run start` — démarre le build en production
-- `npm run lint` — lance ESLint
-
-## Bonnes pratiques et recommandations
-
-- Utiliser une variable d'environnement `NEXT_PUBLIC_API_BASE` pour configurer l'URL de l'API.
-- Pour la production, déployer sur une plateforme adaptée (Vercel, Netlify, Docker + CDN) et protéger toute clé côté serveur.
-- Vérifier la compatibilité Node.js/Next.js (préférer une version LTS récente).
-
-## Déploiement
-
-<!-- - Vercel : configuration simple si vous utilisez le repo GitHub (paramètres d'environnement `NEXT_PUBLIC_API_BASE`).
-- Docker : builder l'image et servir le build statique derrière un reverse proxy.-->
-
-## Structure
-
-- `web/src/app` — pages / layout (App Router)
-- `web/src/components` — composants UI
-- `web/src/lib/config.ts` — configuration de base (API)
-- `web/public/presets.json` — (optionnel) presets de démonstration générés depuis `Data/generate_presets.py`
-
-## Note
-
-La documentation de l'API se trouve dans `API/README.md` (endpoints `/predict`, `/explain`, etc.). Le front attend le format JSON compatible avec l'API décrite.
-
-## Auteur
-
-**Kodjo Jean DEGBEVI** - *kodjojeandegbevi@gmail.com* - DKTech Innovations

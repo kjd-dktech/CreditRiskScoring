@@ -1,6 +1,5 @@
 'use client'
 import { useEffect, useState } from 'react'
-import { API_BASE } from '@/lib/config'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { SAMPLES, loadDynamicPresets, type DynamicPreset } from '@/lib/samples'
@@ -120,7 +119,7 @@ export default function Home() {
     try {
       const v = validate()
       if (v) throw new Error(v)
-      const r = await fetch(`${API_BASE}/predict`, {
+      const r = await fetch('api/predict', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(form),
@@ -141,7 +140,7 @@ export default function Home() {
   useEffect(() => {
     const loadMeta = async () => {
       try {
-        const r = await fetch(`${API_BASE}/metadata`)
+        const r = await fetch('api/metadata')
         if (!r.ok) return
         const data = await r.json()
         if (Array.isArray(data?.loan_types) && data.loan_types.length) {
@@ -169,9 +168,9 @@ export default function Home() {
     setLoading(true)
     setError(null)
     try {
-      const r = await fetch(`${API_BASE}/explain`, {
+      const r = await fetch('api/explain', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json'},
         body: JSON.stringify(form),
       })
       if (!r.ok) throw new Error(`Explain failed: ${r.status}`)

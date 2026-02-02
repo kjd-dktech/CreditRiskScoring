@@ -1,84 +1,58 @@
-# CreditRiskScoring — scoring de risque de crédit
+# CreditRiskScoring
 
 Modélisation prédictive du risque de crédit pour l'inclusion financière.
 
-[![license](https://img.shields.io/github/license/kjd-dktech/CreditRiskScoring?color=blue)](LICENSE) [![python](https://img.shields.io/badge/python-3.10%2B-blue)](https://www.python.org/) [![issues](https://img.shields.io/github/issues/kjd-dktech/CreditRiskScoring)](https://github.com/kjd-dktech/CreditRiskScoring/issues)
+[![license](https://img.shields.io/github/license/kjd-dktech/CreditRiskScoring?color=blue)](LICENSE) [![python](https://img.shields.io/badge/python-3.10%2B-blue)](https://www.python.org/)
 
-Projet de scoring de risque de crédit (préprocessing, modèles, API et interface web). Ce README donne l'essentiel pour exécuter et explorer le dépôt. Remplacez `kjd-dktech/CreditRiskScoring` par le chemin de votre dépôt GitHub pour activer les badges.
+Projet complet comprenant :
+- **API** : FastAPI, scikit-learn, SHAP (Backend)
+- **Web** : Next.js, Tailwind CSS (Frontend)
+- **Data** : Pipelines de preprocessing et modèles
 
-## Raccourci (si vous voulez tester rapidement)
+## Démarrage rapide (Docker)
 
-1. Cloner le dépôt
-
-   ```bash
-      git clone https://github.com/kjd-dktech/CreditRiskScoring.git
-      cd CreditRiskScoring
-   ```
-
-2. Créer un environnement Python et installer les dépendances
-
-   ```bash
-      python3 -m venv .venv
-      source .venv/bin/activate
-      pip install -r requirements.txt
-   ```
-
-3. Lancer l'API en mode développement
-
-   ```bash
-      cd API
-      uvicorn main:app --reload
-   ```
-
-   La documentation interactive Swagger sera disponible sur `http://127.0.0.1:8000/docs`.
-
-4. (Facultatif) Démarrer le front-end (si vous avez Node.js)
-
-   ```bash
-      cd web
-      npm install
-      npm run dev
-   ```
-
-L'interface web par défaut sera sur `http://localhost:3000` et communiquera avec l'API (configurable via `NEXT_PUBLIC_API_BASE`).
-
-## Arborescence principale (sélection)
-
-- `API/` : API FastAPI (endpoints, preprocessing, modèles sauvegardés)
-- `Data/` : jeux de données et scripts utilitaires (ex : génération de presets)
-- `Notebook/` : notebooks d'exploration et rapports
-- `web/` : application Next.js (demo UI)
-- `Docs/` : rapports et exports
-
-## Artefacts ML
-
-- Modèles et pipelines : `API/ml_models/`
-- Explainer SHAP : `API/shap_explainer/`
-- Préprocessing / encoders / lists : `API/processing_elements/`
-
-## Presets de démonstration
-
-Un utilitaire génère des presets JSON utilisés par le front :
+Méthode recommandée pour tester l'ensemble du projet.
 
 ```bash
-# dry-run
-python Data/generate_presets.py --dry-run
-
-# écrire des presets dans web/public/presets.json
-python Data/generate_presets.py --out web/public/presets.json
-
-# helper
-bash Data/presets.sh
+docker compose up
 ```
 
-## Points d'attention / recommandations
+- **Web** : [http://localhost:3000](http://localhost:3000)
+- **Documentation API** : [http://localhost:7860/docs](http://localhost:7860/docs)
 
-- Vérifier que `API/ml_models/` contient bien les artefacts requis (pkl). L'API retourne 503 si le modèle principal est absent.
-- Configurez `MASTER_SECRET` si vous utilisez les routes d'administration (header `X-ADMIN-SECRET`).
-- Pour la production : sécurisez les endpoints (API keys, rate limiting), utilisez une image Python optimisée et un process manager ASGI.
+## Installation Manuelle (Développement)
 
-## Contribution & contact
+Si vous n'utilisez pas Docker, vous devez lancer l'API et le Web séparément.
 
-Auteur : Kodjo Jean DEGBEVI — kodjojeandegbevi@gmail.com — DKTech Innovations
+### 1. API
 
-Voir `LICENSE` pour les conditions d'utilisation.
+```bash
+cd API
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+python -m uvicorn main:app --reload
+# Access: http://localhost:8000
+```
+
+### 2. Web
+
+```bash
+cd web
+npm install
+npm run dev
+# Access: http://localhost:3000
+```
+
+## Structure
+
+- `API/` : Backend FastAPI (preprocessing, modèles, endpoints).
+- `web/` : Frontend Next.js.
+- `Data/` : Jeux de données et scripts (génération de presets).
+- `Notebook/` : Analyses exploratoires et rapports.
+- `Docs/` : Documentation projet.
+
+## Auteur
+
+**Kodjo Jean DEGBEVI** — DKTech Innovations
+

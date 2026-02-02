@@ -1,6 +1,5 @@
 'use client'
 import { useEffect, useState } from 'react'
-import { API_BASE } from '@/lib/config'
 
 function fetchWithTimeout(url: string, ms = 3000) {
   const controller = new AbortController()
@@ -15,7 +14,7 @@ export function ApiStatus() {
     let cancelled = false
     const ping = async () => {
       try {
-        const r = await fetchWithTimeout(`${API_BASE}/health`, 3000)
+        const r = await fetchWithTimeout('/api/health', 3000)
         if (!r.ok) throw new Error('bad status')
         const j = await r.json()
         if (!cancelled) setStatus(j?.status === 'healthy' ? 'online' : 'offline')

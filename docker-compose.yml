@@ -1,0 +1,35 @@
+services:
+  api:
+
+    image: kjddktech/credit-risk-scoring-api:v1
+    container_name: creditrisk_api
+    ports:
+      - "7860:7860"
+    environment:
+      - PORT=7860
+      - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-http://localhost:3000}
+      - API_KEY=${API_KEY}
+      - RATE_LIMIT_PER_MIN=${RATE_LIMIT_PER_MIN:-120}
+    volumes:
+      - API:/home/user/app/API
+      - Data:/home/user/app/Data
+    restart: unless-stopped
+
+  web:
+    build:
+      context: ./web
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_BASE: http://localhost:7860
+    image: kjddktech/credit-risk-scoring-web:v1
+    container_name: creditrisk_web
+    ports:
+      - "3000:7860"
+    environment:
+      - PORT=7860
+    depends_on:
+      - api
+    restart: unless-stopped
+volumes:
+  API:
+  Data:

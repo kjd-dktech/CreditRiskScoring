@@ -17,14 +17,6 @@ export const SAMPLES: Record<string, LoanForm> = {
     New_versus_Repeat: "Repeat Loan",
     loan_type: 'Type_12',
   },
-  "Low risk — Type_22": {
-    Total_Amount: 800,
-    Total_Amount_to_Repay: 1200,
-    duration: 180,
-    Lender_portion_to_be_repaid: 1200,
-    New_versus_Repeat: "New Loan",
-    loan_type: 'Type_22',
-  },
   "Low risk — Type_1": {
     Total_Amount: 1919,
     Total_Amount_to_Repay: 1989,

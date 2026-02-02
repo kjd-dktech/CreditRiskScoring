@@ -1,15 +1,20 @@
 from loguru import logger
 import os
 import sys
+from pathlib import Path
 
-log_dir = "logs"
-os.makedirs(log_dir, exist_ok=True)
+# Utiliser un chemin absolu basé sur l'emplacement de ce fichier
+# pour que les logs aillent toujours dans API/logs/ quel que soit le CWD
+CURRENT_DIR = Path(__file__).resolve().parent
+log_dir = CURRENT_DIR / "logs"
+log_dir.mkdir(exist_ok=True)
+
 logger.remove()
 
 logger.add(sys.stdout, level="INFO", colorize=True,
            format="<green>{time:YYYY-MM-DD HH:mm:ss}</green> | <level>{level}</level> | <cyan>{message}</cyan>")
 logger.add(
-    os.path.join(log_dir, "credit_scoring.log"),
+    log_dir / "credit_scoring.log",
     rotation="00:00",
     retention="7 days",
     level="DEBUG",

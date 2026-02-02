@@ -1,61 +1,153 @@
 #!/usr/bin/env python
 import os
 import sys
-import joblib
-import warnings
-from pathlib import Path
-from fastapi import FastAPI, HTTPException
+import time
 import math
+import warnings
+import joblib
+import numpy as np
+import pandas as pd
+from pathlib import Path
+from collections import defaultdict, deque
+from typing import Optional, Dict
+
+from dotenv import load_dotenv
+from fastapi import FastAPI, HTTPException, Depends, Request, Header
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-import pandas as pd
 
-# Suppression des warnings de compatibilité
+# Chargement des variables d'environnement
+load_dotenv()
+
+# Suppression des warnings
 warnings.filterwarnings("ignore")
 
-# Ajout du chemin pour les imports
+# --- Logger Configuration ---
+try:
+    # Tentative d'import absolu (cas lancement depuis root 'python -m uvicorn API.main:app')
+    from API.logger_config import logger
+except ImportError:
+    try:
+        # Tentative d'import relatif (cas lancement depuis API/ 'python main.py')
+        from logger_config import logger
+    except ImportError:
+        import logging
+        logging.basicConfig(level=logging.INFO)
+        logger = logging.getLogger("API")
+        logger.warning("Logger Loguru non chargé, pas de logs fichier.")
+
+# --- Configuration des chemins et imports ---
 CURRENT_FILE_DIR = Path(__file__).resolve().parent
 REPO_ROOT = CURRENT_FILE_DIR.parent
-sys.path.append(str(REPO_ROOT))
 
-from API.processing_elements.preprocess import preprocessor, loan_type_dtype
+# Ajout du root au path pour permettre les imports absolus 'API.processing_elements...'
+if str(REPO_ROOT) not in sys.path:
+    sys.path.append(str(REPO_ROOT))
 
-# Chargement des modèles avec gestion d'erreur (paths relatifs au fichier)
-MODEL_PATH = REPO_ROOT / "API/ml_models/Stacking_model.pkl"
-#ENCODER_PATH = 
-EXPLAINER_PATH = REPO_ROOT / "API/shap_explainer/explainer.pkl"
-
+# Tentative d'import du préprocesseur
 try:
-    model = joblib.load(MODEL_PATH)
-    print("✅ Modèle principal chargé")
+    from API.processing_elements.preprocess import preprocessor, loan_type_dtype
 except Exception as e:
-    print(f"❌ Erreur chargement modèle: {e}")
-    model = None
+    logger.error(f"Erreur CRITIQUE d'import du preprocessing : {e}")
+    preprocessor = None
+    loan_type_dtype = None
 
-try:
-    explainer = joblib.load(EXPLAINER_PATH)
-    print("✅ Explainer SHAP chargé")
-except Exception as e:
-    print(f"❌ Erreur chargement explainer: {e}")
-    explainer = None
+# --- Chargement des artefacts ML ---
+MODEL_PATH = CURRENT_FILE_DIR / "ml_models/Stacking_model.pkl"
+EXPLAINER_PATH = CURRENT_FILE_DIR / "shap_explainer/explainer.pkl"
 
-# Configuration FastAPI
+def load_artifact(path: Path, label: str):
+    if not path.exists():
+        logger.warning(f"⚠️ Artefact absent : {path} ({label})")
+        return None
+    try:
+        obj = joblib.load(path)
+        logger.info(f"✅ {label} chargé")
+        return obj
+    except Exception as e:
+        logger.error(f"❌ Erreur chargement {label} : {e}")
+        return None
+
+model = load_artifact(MODEL_PATH, "Modèle Stacking")
+explainer = load_artifact(EXPLAINER_PATH, "Explainer SHAP")
+
+# --- Configuration FastAPI ---
 app = FastAPI(
-    title="Credit Risk Scoring API - Demo",
-    description="API simplifiée pour prédiction du risque de crédit",
-    version="1.0.0"
+    title="Credit Risk Scoring API",
+    description="API de prédiction de risque de crédit avec explicabilité SHAP.",
+    version="1.1.0"
 )
 
-# Configuration CORS pour Next.js
+# Sécurité & CORS
+ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "*")
+origins_list = ["*"] if ALLOWED_ORIGINS == "*" else [o.strip() for o in ALLOWED_ORIGINS.split(",") if o]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Demo: autoriser toute origine
+    allow_origins=origins_list,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Modèle de données d'entrée
+# --- Rate Limiting & Auth ---
+RATE_LIMIT_PER_MIN = int(os.getenv("RATE_LIMIT_PER_MIN", "60"))
+API_KEY_EXPECTED = os.getenv("API_KEY") # Peut être None (mode ouvert)
+
+# Store simple avec nettoyage
+_rate_store: Dict[str, deque] = defaultdict(deque)
+
+def _clean_rate_store():
+    """Nettoyage simple pour éviter fuite mémoire"""
+    if len(_rate_store) > 1000:
+        _rate_store.clear()
+
+def _check_rate_limit(key: str) -> bool:
+    now = time.time()
+    dq = _rate_store[key]
+    
+    # Retirer les requêtes plus vieilles que 60s
+    while dq and dq[0] < now - 60:
+        dq.popleft()
+    
+    if len(dq) >= RATE_LIMIT_PER_MIN:
+        return False
+    
+    dq.append(now)
+    _clean_rate_store() # Nettoyage occasionnel
+    return True
+
+async def verify_api_key(
+    x_api_key: Optional[str] = Header(None), 
+    authorization: Optional[str] = Header(None)
+) -> str:
+    """
+    Vérifie la clé API. 
+    Si API_KEY n'est pas défini dans l'env, l'accès est public (warning).
+    """
+    if not API_KEY_EXPECTED:
+        return "public"
+        
+    token = x_api_key
+    if not token and authorization:
+        parts = authorization.split()
+        if len(parts) == 2 and parts[0].lower() == "bearer":
+            token = parts[1]
+    
+    if not token:
+        raise HTTPException(status_code=401, detail="API Key manquante")
+    if token != API_KEY_EXPECTED:
+        raise HTTPException(status_code=403, detail="API Key invalide")
+        
+    return token
+
+async def rate_limiter_dependency(request: Request, api_ident: str = Depends(verify_api_key)):
+    # Identifiant pour le rate limit : clé API ou IP si public
+    key = api_ident if api_ident != "public" else (request.client.host or "unknown")
+    if not _check_rate_limit(key):
+        raise HTTPException(status_code=429, detail="Too Many Requests")
+
+# --- Modèles Pydantic ---
 class LoanProfile(BaseModel):
     Total_Amount: float
     Total_Amount_to_Repay: float
@@ -65,6 +157,7 @@ class LoanProfile(BaseModel):
     loan_type: str
 
     class Config:
+        # Compatible Pydantic v1/v2 (selon version installée)
         schema_extra = {
             "example": {
                 "Total_Amount": 1000.0,
@@ -76,163 +169,170 @@ class LoanProfile(BaseModel):
             }
         }
 
-# Endpoint racine
+# --- Routes ---
+
 @app.get("/")
 def root():
     return {
-        "message": "Credit Risk Scoring API - Ready for demo",
+        "message": "Credit Risk Scoring API - Ready",
         "status": "online",
-        "endpoints": ["/predict", "/proba", "/explain", "/metadata", "/health"]
+        "auth_enabled": bool(API_KEY_EXPECTED),
+        "docs": "/docs"
     }
 
-# Endpoint de santé
 @app.get("/health")
 def health_check():
     return {
         "status": "healthy",
         "model_loaded": model is not None,
         "explainer_loaded": explainer is not None,
+        "preprocessing_loaded": preprocessor is not None
     }
 
-# Endpoint metadata (valeurs de référence)
-@app.get("/metadata")
+@app.get("/metadata", dependencies=[Depends(rate_limiter_dependency)])
 def metadata():
+    if not loan_type_dtype:
+        raise HTTPException(status_code=503, detail="Preprocessing non disponible")
     try:
-        loan_types = [str(x) for x in getattr(loan_type_dtype, 'categories', [])].sort()
-        new_repeat_loan = ['New Loan', 'Repeat Loan']
-        return {"loan_types": loan_types, "new_repeat_loan" : new_repeat_loan}
+        # Gestion safe de loan_type_dtype
+        cats = getattr(loan_type_dtype, 'categories', [])
+        return {
+            "loan_types": sorted([str(x) for x in cats]),
+            "new_repeat_loan": ['New Loan', 'Repeat Loan']
+        }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Erreur metadata: {str(e)}")
+        logger.error(f"Metadata error: {e}")
+        raise HTTPException(status_code=500, detail="Erreur metadata")
 
-# Endpoint de prédiction
-@app.post("/predict")
+@app.post("/predict", dependencies=[Depends(rate_limiter_dependency)])
 def predict(profile: LoanProfile):
-    """
-    Prédire le risque de défaut pour un profil de prêt
-    
-    Returns:
-        - probability: Probabilité de défaut (0-1)
-        - prediction: Classe prédite (0=pas de défaut, 1=défaut)
-        - risk_level: Niveau de risque (Low/Medium/High)
-    """
-    if model is None:
+    if not model or not preprocessor:
         raise HTTPException(status_code=503, detail="Modèle non disponible")
         
     try:
-        # Conversion en DataFrame
         df = pd.DataFrame([profile.model_dump()])
-        # Preprocessing
-        df_preprocessed = preprocessor(df)
-        # Prédiction
-        proba = float(model.predict_proba(df_preprocessed)[0][1])
-        pred = int(proba >= 0.5)
-        # Calcul du niveau de risque
-        if proba < 0.3:
-            risk_level = "Low"
-        elif proba < 0.7:
-            risk_level = "Medium"
-        else:
-            risk_level = "High"
+        # Appel preprocessor
+        X = preprocessor(df)
+        
+        # Prédiction (proba classe 1)
+        proba = float(model.predict_proba(X)[0][1])
+        prediction = 1 if proba >= 0.5 else 0
+        
+        # Risk Level
+        if proba < 0.3: level = "Low"
+        elif proba < 0.7: level = "Medium"
+        else: level = "High"
+        
+        # Confiance (Entropie)
+        # Évite log(0)
+        p_safe = max(min(proba, 1 - 1e-9), 1e-9)
+        entropy = -(p_safe * math.log2(p_safe) + (1 - p_safe) * math.log2(1 - p_safe))
+        confidence = max(0.0, 1.0 - entropy)
 
-        # Confiance basée sur l'entropie (plus informatif que max(p,1-p))
-        # H(p) = -[p log2 p + (1-p) log2 (1-p)] ; certitude = 1 - H(p), bornée dans [0,1]
-        p = min(max(proba, 1e-12), 1 - 1e-12)
-        entropy = -(p * math.log(p, 2) + (1 - p) * math.log(1 - p, 2))
-        confidence = max(0.0, min(1.0, 1.0 - entropy))
         return {
             "probability": round(proba, 4),
-            "prediction": pred,
-            "risk_level": risk_level,
+            "prediction": prediction,
+            "risk_level": level,
             "confidence": round(confidence, 4),
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Erreur lors de la prédiction: {str(e)}")
+        logger.error(f"Predict error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
-# Endpoint probabilité seule
-@app.post("/proba")
+@app.post("/proba", dependencies=[Depends(rate_limiter_dependency)])
 def proba(profile: LoanProfile):
-    if model is None:
+    if not model or not preprocessor:
         raise HTTPException(status_code=503, detail="Modèle non disponible")
     try:
         df = pd.DataFrame([profile.model_dump()])
-        df_preprocessed = preprocessor(df)
-        proba_val = float(model.predict_proba(df_preprocessed)[0][1])
-        return {"probability": round(proba_val, 4)}
+        X = preprocessor(df)
+        val = float(model.predict_proba(X)[0][1])
+        return {"probability": round(val, 4)}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Erreur lors du calcul de probabilité: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
 
-# Endpoint d'explication
-@app.post("/explain")
+@app.post("/explain", dependencies=[Depends(rate_limiter_dependency)])
 def explain(profile: LoanProfile):
     """
-    Expliquer la prédiction avec SHAP values
-    
-    Returns:
-        - prediction: Classe prédite
-        - probability: Probabilité de défaut
-        - base_value: Valeur de base du modèle
-        - contributions: Contribution de chaque feature
-        - top_features: Top 5 des features les plus importantes
+    Retourne les contributions SHAP.
+    Mode dégradé si explainer non disponible ou erreur.
     """
-    if model is None:
+    if not model or not preprocessor:
         raise HTTPException(status_code=503, detail="Modèle non disponible")
-    
-    if explainer is None:
-        # Fallback sans SHAP - juste les prédictions
+
+    # Prédiction de base (toujours nécessaire)
+    try:
         df = pd.DataFrame([profile.model_dump()])
-        df_preprocessed = preprocessor(df)
-        proba = float(model.predict_proba(df_preprocessed)[0][1])
-        pred = int(proba >= 0.5)
-        
+        X = preprocessor(df)
+        proba = float(model.predict_proba(X)[0][1])
+        pred = 1 if proba >= 0.5 else 0
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erreur prédiction: {e}")
+
+    # Fallback si pas d'explainer
+    if not explainer:
         return {
             "prediction": pred,
-            "probability": round(float(proba), 4),
+            "probability": round(proba, 4),
+            "status": "warning_no_explainer",
             "base_value": 0.5,
-            "contributions": {"message": "Explainer SHAP non disponible"},
-            "top_features": [{"feature": "N/A", "contribution": 0, "impact": "unknown"}]
+            "contributions": {},
+            "top_features": []
         }
-        
+
     try:
-        # Conversion en DataFrame
-        df = pd.DataFrame([profile.model_dump()])
-        # Preprocessing
-        df_preprocessed = preprocessor(df)
-        # Prédiction
-        proba = float(model.predict_proba(df_preprocessed)[0][1])
-        pred = int(proba >= 0.5)
-        # SHAP values
-        shap_values = explainer.shap_values(df_preprocessed)
-        # Gestion du format des SHAP values
+        # Calcul SHAP
+        shap_values = explainer.shap_values(X)
+        
+        # Extraction vecteur importance (pour classe 1)
         if isinstance(shap_values, list):
-            shap_vector = shap_values[1][0]  # Classe positive
+            # Classification binaire -> liste de 2 arrays
+            shap_vector = shap_values[1][0]
         else:
             shap_vector = shap_values[0]
+
         # Base value
-        base_value = explainer.expected_value
-        if isinstance(base_value, list):
-            base_value = float(base_value[1])
+        bv = explainer.expected_value
+        if isinstance(bv, (list, np.ndarray)):
+            base_value = float(bv[1]) if len(bv) > 1 else float(bv[0])
         else:
-            base_value = float(base_value)
-        # Contributions par feature
-        #feature_names = df_preprocessed.columns.tolist()
+            base_value = float(bv)
+
+        # Mapping features (Noms en français pour l'UI actuel)
         feature_names = ["Montant à rembourser", "Durée", "Part prêteur à rembourser", "Statut du client", "Type de prêt"]
-        contributions = {str(feature): float(shap_val) for feature, shap_val in zip(feature_names, shap_vector)}
-        # Top 5 des features les plus importantes (valeur absolue)
-        sorted_contributions = sorted(contributions.items(), key=lambda x: abs(x[1]), reverse=True)
+        
+        contributions = {}
+        for i, val in enumerate(shap_vector):
+            # On mappe sur les noms tant qu'il y en a, sinon Feature_X
+            fname = feature_names[i] if i < len(feature_names) else f"Feature_{i}"
+            contributions[fname] = float(val)
+
+        # Top 5
+        sorted_contribs = sorted(contributions.items(), key=lambda x: abs(x[1]), reverse=True)
         top_features = [
-            {"feature": feature, "contribution": contrib, "impact": "increases_risk" if contrib > 0 else "decreases_risk"}
-            for feature, contrib in sorted_contributions[:5]
+            {"feature": k, "contribution": v, "impact": "increases_risk" if v > 0 else "decreases_risk"}
+            for k, v in sorted_contribs[:5]
         ]
+
         return {
             "prediction": pred,
-            "probability": round(float(proba), 4),
+            "probability": round(proba, 4),
             "base_value": round(base_value, 4),
             "contributions": {k: round(v, 4) for k, v in contributions.items()},
-            "top_features": top_features,
+            "top_features": top_features
         }
+
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Erreur lors de l'explication: {str(e)}")
+        logger.error(f"SHAP Explainer Error: {e}")
+        # Retourne tout de même la prédiction correcte
+        return {
+            "prediction": pred,
+            "probability": round(proba, 4),
+            "error": "Erreur explication", 
+            "details": str(e)
+        }
 
 if __name__ == "__main__":
     import uvicorn
+    # Permet de lancer le fichier directement pour tester
     uvicorn.run(app, host="0.0.0.0", port=8000)
